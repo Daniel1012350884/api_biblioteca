@@ -3,15 +3,19 @@ import { BadRequestError, NotFoundError } from "../../shared/errors/AppError";
 import { BooksRepository } from "../books/books.repository";
 import { Loan, LoanDTO } from "./loans.model";
 import { LoansRepository } from "./loans.repository";
+import { ensureHasChanges, ensureRequiredFields, parseObjectId } from "../../shared/utils/validation";
 
 export class LoansService {
     private readonly loansRepository = new LoansRepository();
     private readonly booksRepository = new BooksRepository();
 
     async create(data: LoanDTO): Promise<Loan> {
-        const bookId = this.toObjectId(data?.bookId as string);
-        const userName = this.requireString(data?.userName, "userName");
-        const loanDate = this.requireDate(data?.loanDate, "loanDate");
+        // Primero se avisa de TODO lo que falta (bookId, userName, loanDate).
+        ensureRequiredFields(data, ["bookId", "userName", "loanDate"]);
+
+        const bookId = this.toObjectId(data.bookId, "bookId");
+        const userName = this.requireString(data.userName, "userName");
+        const loanDate = this.requireDate(data.loanDate, "loanDate");
 
         // Relación: el libro debe existir.
         if (!(await this.booksRepository.findById(bookId))) {
@@ -56,6 +60,7 @@ export class LoansService {
     }
 
     async update(id: string, data: LoanDTO): Promise<Loan> {
+        data = data ?? {};
         const objectId = this.toObjectId(id);
         const loan = await this.loansRepository.findById(objectId);
         if (!loan) throw new NotFoundError("Préstamo no encontrado");
@@ -84,9 +89,7 @@ export class LoansService {
             }
         }
 
-        if (Object.keys(changes).length === 0) {
-            throw new BadRequestError("No se enviaron campos para actualizar");
-        }
+        ensureHasChanges(changes, ["userName", "loanDate", "returned"]);
 
         changes.updatedAt = new Date();
 
@@ -127,10 +130,7 @@ export class LoansService {
         return date;
     }
 
-    private toObjectId(id: string): ObjectId {
-        if (typeof id !== "string" || !ObjectId.isValid(id)) {
-            throw new BadRequestError(`Identificador inválido: ${id}`);
-        }
-        return new ObjectId(id);
+    private toObjectId(id: unknown, field = "id"): ObjectId {
+        return parseObjectId(id, field);
     }
 }

@@ -7,8 +7,14 @@ let db: Db;
 export const connectDB = async (): Promise<void> => {
     client = new MongoClient(env.mongoUri);
     await client.connect();
-    db = client.db(env.mongoDBName);
-    console.log(`Conectado a MongoDB (db: ${env.mongoDBName})`);
+
+    // El nombre de la base se toma siempre del .env (respeta mayúsculas: Library).
+    db = client.db(env.mongoDbName);
+
+    // Índice único: MongoDB también garantiza que no haya ISBN repetidos.
+    await db.collection("books").createIndex({ isbn: 1 }, { unique: true });
+
+    console.log(`Conectado a MongoDB (base de datos: ${env.mongoDbName})`);
 };
 
 export const getDb = (): Db => {
@@ -16,4 +22,8 @@ export const getDb = (): Db => {
         throw new Error("La base de datos no ha sido inicializada");
     }
     return db;
+};
+
+export const closeDB = async (): Promise<void> => {
+    await client?.close();
 };

@@ -4,8 +4,8 @@ export interface Author {
     _id?: ObjectId;
     name: string;
     nationality: string;
-    birthYear: number;
-    biography: string;
+    birthYear?: number;   // opcional según el enunciado
+    biography?: string;   // campo extra, opcional
     active: boolean;
     createdAt: Date;
     updatedAt: Date;

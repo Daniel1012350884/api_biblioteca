@@ -3,15 +3,19 @@ import { BadRequestError, NotFoundError } from "../../shared/errors/AppError";
 import { AuthorsRepository } from "../authors/authors.repository";
 import { Book, BookDTO } from "./books.model";
 import { BooksRepository } from "./books.repository";
+import { ensureHasChanges, ensureRequiredFields, parseObjectId } from "../../shared/utils/validation";
 
 export class BooksService {
     private readonly booksRepository = new BooksRepository();
     private readonly authorsRepository = new AuthorsRepository();
 
     async create(data: BookDTO): Promise<Book> {
-        const title = this.requireString(data?.title, "title");
-        const isbn = this.requireString(data?.isbn, "isbn");
-        const authorId = this.toObjectId(data?.authorId as string);
+        // Primero se avisa de TODO lo que falta (title, isbn, authorId).
+        ensureRequiredFields(data, ["title", "isbn", "authorId"]);
+
+        const title = this.requireString(data.title, "title");
+        const isbn = this.requireString(data.isbn, "isbn");
+        const authorId = this.toObjectId(data.authorId, "authorId");
         const year = this.optionalYear(data?.year);
 
         // Relación: el autor debe existir.
@@ -47,6 +51,7 @@ export class BooksService {
     }
 
     async update(id: string, data: BookDTO): Promise<Book> {
+        data = data ?? {};
         const objectId = this.toObjectId(id);
         const current = await this.booksRepository.findById(objectId);
         if (!current) throw new NotFoundError("Libro no encontrado");
@@ -60,15 +65,13 @@ export class BooksService {
             changes.isbn = isbn;
         }
         if (data.authorId !== undefined) {
-            const authorId = this.toObjectId(data.authorId);
+            const authorId = this.toObjectId(data.authorId, "authorId");
             await this.ensureAuthorExists(authorId);
             changes.authorId = authorId;
         }
         if (data.year !== undefined) changes.year = this.optionalYear(data.year);
 
-        if (Object.keys(changes).length === 0) {
-            throw new BadRequestError("No se enviaron campos para actualizar");
-        }
+        ensureHasChanges(changes, ["title", "isbn", "authorId", "year"]);
 
         changes.updatedAt = new Date();
 
@@ -109,10 +112,7 @@ export class BooksService {
         return value;
     }
 
-    private toObjectId(id: string): ObjectId {
-        if (typeof id !== "string" || !ObjectId.isValid(id)) {
-            throw new BadRequestError(`Identificador inválido: ${id}`);
-        }
-        return new ObjectId(id);
+    private toObjectId(id: unknown, field = "id"): ObjectId {
+        return parseObjectId(id, field);
     }
 }

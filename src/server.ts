@@ -1,14 +1,14 @@
 import { app } from "./app";
-import { env } from "./config/env";
 import { connectDB } from "./config/database";
+import { env } from "./config/env";
 
-const bootstrap = async (): Promise<void> => {
+async function bootstrap(): Promise<void> {
     await connectDB();
 
     app.listen(env.port, () => {
         console.log(`Servidor corriendo en el puerto ${env.port} [${env.nodeEnv}]`);
     });
-};
+}
 
 bootstrap().catch((error) => {
     console.error("Error al iniciar la aplicación:", error);

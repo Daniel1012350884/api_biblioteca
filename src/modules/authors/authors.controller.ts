@@ -19,6 +19,11 @@ export class AuthorsController {
         res.status(200).json(author);
     };
 
+    findBooks = async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+        const books = await this.authorsService.findBooks(req.params.id);
+        res.status(200).json(books);
+    };
+
     update = async (req: Request<{ id: string }>, res: Response): Promise<void> => {
         const author = await this.authorsService.update(req.params.id, req.body);
         res.status(200).json(author);
