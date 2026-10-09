@@ -25,7 +25,7 @@ export class LoansService {
         // Regla de negocio: solo se presta si available === true.
         // markAsLoaned es atómico: valida y cambia a available:false en un solo paso.
         if (!(await this.booksRepository.markAsLoaned(bookId))) {
-            throw new BadRequestError("El libro no está disponible para préstamo");
+            throw new BadRequestError(" libro no disponible para préstamo");
         }
 
         const now = new Date();
