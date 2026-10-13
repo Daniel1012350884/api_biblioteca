@@ -20,7 +20,9 @@ export class BooksService {
         if (!Array.isArray(data.genreIds) || data.genreIds.length === 0) {
             throw new BadRequestError("El campo 'genreIds' debe ser un arreglo de IDs no vacío");
         }
-        const genreIds = data.genreIds.map((id) => this.toObjectId(id, "genreIds"));
+        
+        // CORRECCIÓN: Se agrega ": string" al parámetro id
+        const genreIds = data.genreIds.map((id: string) => this.toObjectId(id, "genreIds"));
         
         const year = this.optionalYear(data?.year);
 
@@ -80,7 +82,8 @@ export class BooksService {
             if (!Array.isArray(data.genreIds) || data.genreIds.length === 0) {
                 throw new BadRequestError("El campo 'genreIds' debe ser un arreglo de IDs no vacío");
             }
-            changes.genreIds = data.genreIds.map((id) => this.toObjectId(id, "genreIds"));
+            // CORRECCIÓN: Se agrega ": string" al parámetro id
+            changes.genreIds = data.genreIds.map((id: string) => this.toObjectId(id, "genreIds"));
         }
         if (data.year !== undefined) changes.year = this.optionalYear(data.year);
 
