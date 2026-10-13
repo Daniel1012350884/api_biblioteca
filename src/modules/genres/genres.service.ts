@@ -3,9 +3,11 @@ import { BadRequestError, NotFoundError } from "../../shared/errors/AppError";
 import { Genres, GenresDTO } from "./genres.model";
 import { GenresRepository } from "./genres.repository";
 import { ensureHasChanges, ensureRequiredFields, parseObjectId } from "../../shared/utils/validation";
+import { BooksRepository } from "../books/books.repository"; // <-- NUEVO: Importamos el repositorio de libros
 
 export class GenresService {
     private readonly genresRepository = new GenresRepository();
+    private readonly booksRepository = new BooksRepository(); // <-- NUEVO: Instanciamos el repositorio
 
     async create(data: GenresDTO): Promise<Genres> {
         ensureRequiredFields(data, ["name"]);
@@ -24,7 +26,6 @@ export class GenresService {
 
     async findAll(): Promise<Genres[]> {
         return this.genresRepository.findAll();
-        
     }
 
     async findById(id: string): Promise<Genres> {
@@ -53,7 +54,15 @@ export class GenresService {
     }
 
     async delete(id: string): Promise<void> {
-        const deleted = await this.genresRepository.delete(this.toObjectId(id));
+        const objectId = this.toObjectId(id);
+        
+        // <-- NUEVO: Validar que el género no esté en uso por ningún libro
+        const hasBooks = await this.booksRepository.existsByGenreId(objectId);
+        if (hasBooks) {
+            throw new BadRequestError("No se puede eliminar el género porque hay libros asociados a él.");
+        }
+
+        const deleted = await this.genresRepository.delete(objectId);
         if (!deleted) throw new NotFoundError("Género no encontrado");
     }
 

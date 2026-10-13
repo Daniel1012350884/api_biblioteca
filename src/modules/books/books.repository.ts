@@ -1,13 +1,18 @@
-import { Collection, ObjectId } from "mongodb";
+import { Collection, ObjectId } from "mongodb"; 
 import { getDb } from "../../config/database";
 import { Book, BookFilters } from "./books.model";
 
-export type BookWithAuthor = Book & {
+export type BookWithDetails = Book & {
     author?: {
         _id: ObjectId;
         name?: string;
         [key: string]: unknown;
     } | null;
+    genres?: {
+        _id: ObjectId;
+        name?: string;
+        [key: string]: unknown;
+    }[];
 };
 
 export class BooksRepository {
@@ -24,32 +29,25 @@ export class BooksRepository {
         return { _id: result.insertedId, ...data };
     }
 
-    async findAll(filters: BookFilters = {}): Promise<Book[]> {
-        return this.collection().find(filters).sort({ createdAt: -1 }).toArray();
-    }
-
-    async findAllWithAuthor(): Promise<BookWithAuthor[]> {
+    async findAll(filters: BookFilters = {}): Promise<BookWithDetails[]> {
         return this.collection()
-            .aggregate<BookWithAuthor>([
-                ...this.authorLookupStages(),
+            .aggregate<BookWithDetails>([
+                { $match: filters },
+                ...this.relationLookupStages(),
                 { $sort: { createdAt: -1 } },
             ])
             .toArray();
     }
 
-    async findByIdWithAuthor(id: ObjectId | string): Promise<BookWithAuthor | null> {
+    async findById(id: ObjectId | string): Promise<BookWithDetails | null> {
         const objectId = this.toObjectId(id, "bookId");
         const result = await this.collection()
-            .aggregate<BookWithAuthor>([
+            .aggregate<BookWithDetails>([
                 { $match: { _id: objectId } },
-                ...this.authorLookupStages(),
+                ...this.relationLookupStages(),
             ])
             .toArray();
         return result[0] ?? null;
-    }
-
-    async findById(id: ObjectId | string): Promise<Book | null> {
-        return this.collection().findOne({ _id: this.toObjectId(id, "bookId") });
     }
 
     async findByIsbn(isbn: string): Promise<Book | null> {
@@ -59,6 +57,11 @@ export class BooksRepository {
     // Usado por la regla de negocio de Autores (no borrar autor con libros).
     async existsByAuthorId(authorId: ObjectId | string): Promise<boolean> {
         return (await this.collection().countDocuments({ authorId: this.toObjectId(authorId, "authorId") }, { limit: 1 })) > 0;
+    }
+
+    async existsByGenreId(genreId: ObjectId | string): Promise<boolean> {
+        const objectId = this.toObjectId(genreId, "genreId");
+        return (await this.collection().countDocuments({ genreIds: objectId }, { limit: 1 })) > 0;
     }
 
     async update(id: ObjectId | string, changes: Partial<Book>): Promise<Book | null> {
@@ -99,7 +102,7 @@ export class BooksRepository {
         );
     }
 
-    private authorLookupStages() {
+    private relationLookupStages() {
         return [
             {
                 $lookup: {
@@ -110,9 +113,16 @@ export class BooksRepository {
                 },
             },
             { $unwind: { path: "$author", preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: "genres",
+                    localField: "genreIds",
+                    foreignField: "_id",
+                    as: "genres",
+                },
+            },
         ];
     }
-
 }
 
 function parseObjectId(id: unknown, field = "id"): ObjectId {

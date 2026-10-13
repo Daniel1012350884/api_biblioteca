@@ -10,33 +10,40 @@ export class BooksService {
     private readonly authorsRepository = new AuthorsRepository();
 
     async create(data: BookDTO): Promise<Book> {
-        // Primero se avisa de TODO lo que falta (title, isbn, authorId).
-        ensureRequiredFields(data, ["title", "isbn", "authorId"]);
+        // Se exige genreIds en la creación
+        ensureRequiredFields(data, ["title", "isbn", "authorId", "genreIds"]);
 
         const title = this.requireString(data.title, "title");
         const isbn = this.requireString(data.isbn, "isbn");
         const authorId = this.toObjectId(data.authorId, "authorId");
+        
+        if (!Array.isArray(data.genreIds) || data.genreIds.length === 0) {
+            throw new BadRequestError("El campo 'genreIds' debe ser un arreglo de IDs no vacío");
+        }
+        const genreIds = data.genreIds.map((id) => this.toObjectId(id, "genreIds"));
+        
         const year = this.optionalYear(data?.year);
 
-        // Relación: el autor debe existir.
         await this.ensureAuthorExists(authorId);
-        // ISBN único.
         await this.ensureIsbnIsFree(isbn);
 
         const now = new Date();
-        return this.booksRepository.create({
+        const createdBook = await this.booksRepository.create({
             title,
             isbn,
             authorId,
+            genreIds,
             ...(year !== undefined && { year }),
             available: true,
             createdAt: now,
             updatedAt: now,
         });
+
+        // Retornamos el libro consultándolo de nuevo para que traiga autor y géneros poblados
+        return this.findById(createdBook._id!.toString());
     }
 
     async findAll(available?: string): Promise<Book[]> {
-        // Extra: GET /books?available=true
         if (available === undefined) return this.booksRepository.findAll();
         if (available !== "true" && available !== "false") {
             throw new BadRequestError("El filtro 'available' debe ser 'true' o 'false'");
@@ -69,15 +76,23 @@ export class BooksService {
             await this.ensureAuthorExists(authorId);
             changes.authorId = authorId;
         }
+        if (data.genreIds !== undefined) {
+            if (!Array.isArray(data.genreIds) || data.genreIds.length === 0) {
+                throw new BadRequestError("El campo 'genreIds' debe ser un arreglo de IDs no vacío");
+            }
+            changes.genreIds = data.genreIds.map((id) => this.toObjectId(id, "genreIds"));
+        }
         if (data.year !== undefined) changes.year = this.optionalYear(data.year);
 
-        ensureHasChanges(changes, ["title", "isbn", "authorId", "year"]);
+        ensureHasChanges(changes, ["title", "isbn", "authorId", "genreIds", "year"]);
 
         changes.updatedAt = new Date();
 
         const updated = await this.booksRepository.update(objectId, changes);
         if (!updated) throw new NotFoundError("Libro no encontrado");
-        return updated;
+        
+        // Retornamos el libro consultándolo de nuevo para que traiga autor y géneros poblados
+        return this.findById(objectId.toString());
     }
 
     async delete(id: string): Promise<void> {
@@ -115,6 +130,4 @@ export class BooksService {
     private toObjectId(id: unknown, field = "id"): ObjectId {
         return parseObjectId(id, field);
     }
-
-    
 }
