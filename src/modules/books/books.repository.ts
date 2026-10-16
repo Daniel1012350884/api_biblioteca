@@ -121,6 +121,12 @@ export class BooksRepository {
                     as: "genres",
                 },
             },
+            {
+                $project: {
+                    "genres._id": 0,
+                    "author._id": 0,
+                }
+            }
         ];
     }
 }
